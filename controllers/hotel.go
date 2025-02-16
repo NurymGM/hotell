@@ -66,7 +66,35 @@ func ReadRoomByID(c *gin.Context) {
 }
 
 func UpdateRoom(c *gin.Context) {
-	
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Invalid room ID"})
+		return
+	}
+	// validate JSON input before DB query and parse json into a map
+    var updateData map[string]interface{}
+    if err := c.ShouldBindJSON(&updateData); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid input"})
+        return
+    }
+	// now look for the room
+	room := models.Room{}
+	if err := initializers.DB.First(&room, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Room not found"})
+			return
+		}
+		log.Println("Database error:", err)
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Error finding room"})
+		return
+	}
+    // Perform the update dynamically
+    result := initializers.DB.Model(&room).Updates(updateData)
+    if result.Error != nil {
+        c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Error updating room"})
+        return
+    }
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Room updated successfully"})
 }
 
 func DeleteRoom(c *gin.Context) {
