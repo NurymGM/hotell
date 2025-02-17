@@ -54,19 +54,18 @@ func ReadRoomByID(c *gin.Context) {
 		return
 	}
 
-	// check Redis cache, if hit, respond with it
+	// check Redis cache, if hit and deserialized then respond with it
 	val, err := initializers.RDB.Get(context.Background(), strconv.Itoa(id)).Result()
 	if err == nil {
-		// Deserialize room
 		room := models.Room{}
-		err2 := json.Unmarshal([]byte(val), &room)
+		err2 := json.Unmarshal([]byte(val), &room)	
 		if err2 == nil {
 			c.IndentedJSON(http.StatusOK, room)
 			return
 		}
 	}
 
-	// else get post from PostgreSQL
+	// else get room from PostgreSQL
 	room := models.Room{}
 	result := initializers.DB.First(&room, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
