@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -13,7 +15,7 @@ import (
 )
 
 func RootRoute(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "Hello wws"})
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Hello wws!"})
 }
 
 func CreateRoom(c *gin.Context) {
@@ -51,6 +53,20 @@ func ReadRoomByID(c *gin.Context) {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "Invalid room ID"})
 		return
 	}
+
+	// check Redis cache, if hit, respond with it
+	val, err := initializers.RDB.Get(context.Background(), strconv.Itoa(id)).Result()
+	if err == nil {
+		// Deserialize room
+		room := models.Room{}
+		err2 := json.Unmarshal([]byte(val), &room)
+		if err2 == nil {
+			c.IndentedJSON(http.StatusOK, room)
+			return
+		}
+	}
+
+	// else get post from PostgreSQL
 	room := models.Room{}
 	result := initializers.DB.First(&room, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -62,6 +78,19 @@ func ReadRoomByID(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Error loading room"})
 		return
 	}
+
+	// Serialize room then add it to Redis cache
+	jsonData, err := json.Marshal(room)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Error marshalling room"})
+		return
+	}
+	err = initializers.RDB.Set(context.Background(), strconv.Itoa(id), jsonData, 0).Err()
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to set value in Redis"})
+		return
+	}
+
 	c.IndentedJSON(http.StatusOK, room)
 }
 
