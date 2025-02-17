@@ -55,7 +55,7 @@ func ReadRoomByID(c *gin.Context) {
 	}
 
 	// check Redis cache, if hit and deserialized then respond with it
-	val, err := initializers.RDB.Get(context.Background(), strconv.Itoa(id)).Result()
+	val, err := initializers.RDB.Get(context.Background(), strconv.Itoa(id)+"room").Result()
 	if err == nil {
 		room := models.Room{}
 		err2 := json.Unmarshal([]byte(val), &room)	
@@ -84,7 +84,7 @@ func ReadRoomByID(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Error marshalling room"})
 		return
 	}
-	err = initializers.RDB.Set(context.Background(), strconv.Itoa(id), jsonData, 0).Err()
+	err = initializers.RDB.Set(context.Background(), strconv.Itoa(id)+"room", jsonData, 0).Err()
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to set value in Redis"})
 		return
